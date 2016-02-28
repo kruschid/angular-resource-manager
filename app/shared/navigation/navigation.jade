@@ -1,0 +1,15 @@
+script(type='text/ng-template', id='navigation/navbar.html')
+  nav.navbar.navbar-default(role='navigation')
+    .navbar-header
+      button.navbar-toggle.collapsed(type='button',ng-init='navCollapsed=true', ng-click='navCollapsed=!navCollapsed')
+        span.sr-only Toggle navigation
+        span.icon-bar
+        span.icon-bar
+        span.icon-bar
+      .navbar-brand GCSJ-ReST-Boilerplate
+    .collapse.navbar-collapse(uib-collapse='navCollapsed')
+      ul.nav.navbar-nav
+        li(ng-repeat='item in navbarCtrl.NavbarItems', ng-class='{active:item.active}')
+          a(ng-compass-path='{{item.routeName}}', ng-compass-params='item.params') {{item.label}} 
+      ul.nav.navbar-nav.navbar-right
+        li: a(ng-compass='login') #[span.glyphicon.glyphicon-log-in] Sign-In

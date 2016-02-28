@@ -1,0 +1,14 @@
+script(type='text/ng-template', id='home/home.html')
+  h2 Home
+  h3 Continents
+  ul: li(ng-repeat='continent in HomeCtrl.continents') 
+    span(ng-bind='continent.data.name')
+  h3 Countries
+  ul: li(ng-repeat='country in HomeCtrl.countries') 
+    span(ng-bind='country.data.name')
+  h3 Cities
+  ul: li(ng-repeat='city in HomeCtrl.cities') 
+    span(ng-bind='city.data.name')
+  h3 One City
+  p Name: #[span(ng-bind='HomeCtrl.oneCity.name')]
+  p Population: #[span(ng-bind='HomeCtrl.oneCity.population')]

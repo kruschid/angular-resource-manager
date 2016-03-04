@@ -3,13 +3,13 @@
 var feathers = require('feathers');
 var memory = require('feathers-memory');
 var bodyParser = require('body-parser');
-var npmConf = require('./package.json');
-var fixtures = require('./test/fixtures.js');
+var conf = require('./conf/gulp.json');
+var fixtures = require('./conf/fixtures.js');
 
 // A Feathers app is the same as an Express app
 var app = feathers();
 
-app.use(feathers.static(__dirname + '/' + npmConf.gcsj.dest.public));
+app.use(feathers.static(conf.views.dest));
 // Add REST API support
 app.configure(feathers.rest());
 // Configure Socket.io real-time APIs

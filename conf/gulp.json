@@ -1,0 +1,52 @@
+{
+  "run": [],
+  "clean": "public/**/*",
+  "components": {
+    "src": [
+      "app/**/*.litcoffee",
+      "app/**/*.coffee"
+    ],  
+    "dest": "public/js/"
+  },
+  "libs": {
+    "src":  [
+      "bower_components/angular/angular.js",
+      "bower_components/angular-route/angular-route.js",
+      "bower_components/angular-compass/js/angular-compass.js",
+      "bower_components/angular-resource/angular-resource.js",
+      "bower_components/angular-bootstrap/ui-bootstrap-tpls.js"
+    ],
+    "dest": "public/js/"
+  },
+  "views": {
+    "src": "app/index.jade",
+    "include": "app/*/**/*.jade",
+    "dest": "public/"
+  },
+  "css": {
+    "src": "app/assets/css/styles.sass",
+    "dest": "public/css/"
+  },
+  "copy": {
+    "bower_components/bootstrap-sass/assets/fonts/bootstrap/*": "public/fonts/"
+  },
+  "karma": {
+    "configFile": "/Users/denis/Dropbox/angular-resource-manager/karma.conf.js",
+    "singleRun": false,
+    "logLevel": "DEBUG"
+  },
+  "nodemon": {
+    "script": "app.js",
+    "watch": [
+      "conf/*"
+    ],
+    "env": {
+      "NODE_ENV": "dev"
+    }
+  },
+  "browserSync": {
+    "proxy": "localhost:3000",
+    "port": 3001,
+    "files": "public/**/*"
+  }
+}

@@ -37,7 +37,7 @@ module.exports = function(config) {
     colors: true,
 
     // level of logging
-    logLevel: config.LOG_INFO,
+    // logLevel: config.LOG_INFO,
 
     // enable / disable watching file and executing tests whenever any file changes
     autoWatch: true,
@@ -46,6 +46,6 @@ module.exports = function(config) {
     browsers: ['Chrome'],
 
     // Continuous Integration mode
-    singleRun: false
+    // singleRun: false
   });
 };

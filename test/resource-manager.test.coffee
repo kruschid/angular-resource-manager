@@ -104,6 +104,11 @@ describe 'Resource', ->
     usersGroups = User.one(5).rel('groups').one(1).get()
     backend.flush()
   
+  it 'should be able to remove relations from context', ->
+    backend.expectGET('/groups/1').respond -> [200]
+    usersGroups = User.one(5).rel('groups').one(1).asBase().get()
+    backend.flush()
+  
   it 'should store resources in same object over several requests', ->
     backend.expectGET('/users/1').respond -> [200, {id:1}]
     user = User.one(1).get()
@@ -138,6 +143,16 @@ describe 'ResourceCollection', ->
     user = User.one(1).rel('users-groups').many().get()
     backend.flush()
     expect(user.data.length).toEqual(3)
+  
+  it 'should be able to remove relations from context', ->
+    backend.expectGET('/users-groups').respond -> [200, []]
+    user = User.one(1).rel('users-groups').many().asBase().get()
+    backend.flush()
+
+  it 'should be able to handle non array responses', ->
+    backend.expectGET('/users').respond -> [200, undefined]
+    user = User.many().get()
+    backend.flush()
     
   it 'should store resources in same object over several requests', ->
     backend.expectGET('/users').respond -> [200, [1,2,3]]

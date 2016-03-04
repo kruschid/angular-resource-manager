@@ -86,7 +86,15 @@ class ResourceLoader
       delete @errors[key] for key of @errors
     @onRejected (response) ->
       angular.extend(@errors, response.data)
-    
+
+  ###*
+  # removes related resource from current context
+  # @return {Resource}
+  ###
+  asBase: ->
+    @baseResource = undefined
+    return @
+ 
   ###*
   # overrides state and
   # calls all callbacks bound to the new state
@@ -205,14 +213,14 @@ class Resource extends ResourceLoader
       # @data[key] = response.data[key] for key of response.data
       
   ###*
-  # builds url for current resource
+  # builds url for current resource (no relation included)
   # @return {String}
   ###
   getUrl: ->
     [@conf.baseUrl, @resource, @id].join('/')
   
   ###*
-  # builds full url of current resource with relation in mind
+  # builds full url of current resource with relations
   # @return {String}
   ###
   getFullUrl: ->
@@ -253,6 +261,8 @@ class ResourceCollection extends ResourceLoader
     # handle reponse
     @data = []
     @onLoaded (response) ->
+      # stop if response body is empty
+      return if not response.data?.length
       @data.splice(0, @data.length) # remove all objects from array
       # wrap each resource inside a Resource instance
       for resource, i in response.data

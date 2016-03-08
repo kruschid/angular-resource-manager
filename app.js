@@ -16,9 +16,31 @@ app.configure(feathers.rest());
 app.configure(feathers.socketio());
 // Parse HTTP JSON bodies
 app.use(bodyParser.json());
-// Register the todo service
-app.use('/api/v1/continents', memory({store:fixtures.continents}));
-app.use('/api/v1/countries', memory({store:fixtures.countries}));
-app.use('/api/v1/cities', memory({store:fixtures.cities}));
+
+// services
+var continents = memory({store:fixtures.continents});
+var countries =  memory({store:fixtures.countries});
+var cities = memory({store:fixtures.cities});
+
+// api
+app.use('/api/v1/continents', continents);
+app.use('/api/v1/countries', countries);
+app.use('/api/v1/countries/:countryId/continent', {
+  find: function(params, callback){
+    countries.get(params.countryId).then(function(country){
+      continents.find({id: country.continentId}).then(function(continents){
+        callback(null, continents)
+      });
+    });
+  } // find
+}); // single resource; no continentId in url
+app.use('/api/v1/countries/:countryId/cities',{
+  find: function(params, callback){
+    cities.find({countryId: params.countryId}).then(function(cities){
+      callback(null, cities);
+    });
+  }
+}); // many resources
+app.use('/api/v1/cities', cities);
 // Start the server
 app.listen(3000);

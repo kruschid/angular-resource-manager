@@ -17,6 +17,7 @@ class ResourceLoader
   # @memberOf ResourceLoader
   ###
   @STATES:
+    DUMPED: 'DUMPED'
     LOADING: 'LOADING' 
     LOADED: 'LOADED'
     REJECTED: 'REJECTED'
@@ -77,6 +78,7 @@ class ResourceLoader
   ###
   constructor: ->
     @callbacks =
+      DUMPED: []
       LOADING: []
       LOADED: []
       REJECTED: []
@@ -86,14 +88,6 @@ class ResourceLoader
       delete @errors[key] for key of @errors
     @onRejected (response) ->
       angular.extend(@errors, response.data)
-
-  ###*
-  # removes related resource from current context
-  # @return {Resource}
-  ###
-  asBase: ->
-    @baseResource = undefined
-    return @
  
   ###*
   # overrides state and
@@ -117,6 +111,13 @@ class ResourceLoader
   bindCallback: (state, cb) ->
     @callbacks[state].push(cb)
     return @
+  
+  ###*
+  # binds callback to DUMPED state
+  # @return {ResourceLoader}
+  ###
+  onDumped: (cb) ->
+    @bindCallback(ResourceLoader.STATES.DUMPED, cb)
   
   ###*
   # binds callback to LOADING state
@@ -164,6 +165,20 @@ class ResourceLoader
     @state is ResourceLoader.STATES.LOADED
   
   ###*
+  # indicates wether resource or collection has been dumped
+  # @return {Boolean}
+  ###
+  isDumped: ->
+    @state is ResourceLoader.STATES.DUMPED
+  
+  ###*
+  # sets base ressource and returns current instance
+  # @return {Resource}
+  ###
+  setBase: (@baseResource) ->
+    return @
+  
+  ###*
   # Performs get request 
   # @return {ResourceLoader}
   # @param {String} url
@@ -207,7 +222,9 @@ class Resource extends ResourceLoader
     # handle response
     @data = {}
     @onLoaded (response) ->
-      delete @data[key] for key of @data
+      # dump data object
+      @dump()
+      # fill data object with response data
       angular.extend(@data, response.data)
       # # angular.extend breaks the reference
       # @data[key] = response.data[key] for key of response.data
@@ -225,7 +242,7 @@ class Resource extends ResourceLoader
   ###
   getFullUrl: ->
     if @baseResource?
-      [@baseResource.getUrl(), @resource, @id].join('/')
+      [@baseResource.getFullUrl(), @resource, @id].join('/')
     else
       @getUrl()
       
@@ -242,6 +259,22 @@ class Resource extends ResourceLoader
   ###
   rel: (subResource) ->
     new ResourceManager(@conf, subResource, @)
+
+  ###*
+  # returns new instance with same id but with reseted  data and baseResource
+  # @return {Resource}
+  ###
+  asBase: ->
+    new Resource(@conf, @resource, @id)
+  
+  ###*
+  # deletes all data an resets state
+  # @return {Resource}
+  ###
+  dump:  ->
+    delete @data[key] for key of @data
+    @setState(ResourceLoader.STATES.DUMPED)
+    return @
     
 ###*
 # Handles resource-collections
@@ -261,8 +294,8 @@ class ResourceCollection extends ResourceLoader
     # handle reponse
     @data = []
     @onLoaded (response) ->
-      # stop if response body is empty
-      return if not response.data?.length
+      # stop if response body is ot an arrayempty
+      return if not Array.isArray(response.data)
       @data.splice(0, @data.length) # remove all objects from array
       # wrap each resource inside a Resource instance
       for resource, i in response.data
@@ -284,7 +317,7 @@ class ResourceCollection extends ResourceLoader
   ###
   getFullUrl: ->
     if @baseResource?
-      [@baseResource.getUrl(), @resource].join('/')
+      [@baseResource.getFullUrl(), @resource].join('/')
     else
       @getUrl()
  
@@ -295,6 +328,15 @@ class ResourceCollection extends ResourceLoader
   ###
   get: (params) ->
     @makeGetRequest(@getFullUrl(), params)
+
+  ###*
+  # deletes all data an resets state
+  # @return {ResourceCollection}
+  ###
+  dump:  ->
+    delete @data[key] for key of @data
+    @setState(ResourceLoader.STATES.DUMPED)
+    return @
 
 ###*
 #

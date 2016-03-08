@@ -122,6 +122,11 @@ describe 'Resource', ->
     backend.flush()
     expect(data.name).toBeUndefined()
     expect(data.id).toEqual(1)
+  
+  it 'should be able to dump its data container'
+  it 'should allow to set a new base resource'
+  it 'should allow to set resource as base resource'
+  it 'should create a new instance when using asBase()'
 
 describe 'ResourceCollection', ->
   backend = User = undefined

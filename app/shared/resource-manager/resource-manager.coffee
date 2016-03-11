@@ -17,9 +17,13 @@ class ResourceLoader
   # @memberOf ResourceLoader
   ###
   @STATES:
-    DUMPED: 'DUMPED'
+    CLEANED: 'CLEANED'
     LOADING: 'LOADING' 
     LOADED: 'LOADED'
+    SAVING: 'SAVING'
+    SAVED: 'SAVED'
+    REMOVING: 'REMOVING'
+    REMOVED: 'REMOVED'
     REJECTED: 'REJECTED'
     
   ###*
@@ -78,9 +82,13 @@ class ResourceLoader
   ###
   constructor: ->
     @callbacks =
-      DUMPED: []
+      CLEANED: []
       LOADING: []
       LOADED: []
+      SAVING: []
+      SAVED: []
+      REMOVING: []
+      REMOVED: []
       REJECTED: []
     # error handling
     @errors = {}
@@ -113,11 +121,11 @@ class ResourceLoader
     return @
   
   ###*
-  # binds callback to DUMPED state
+  # binds callback to CLEANED state
   # @return {ResourceLoader}
   ###
-  onDumped: (cb) ->
-    @bindCallback(ResourceLoader.STATES.DUMPED, cb)
+  onCleaned: (cb) ->
+    @bindCallback(ResourceLoader.STATES.CLEANED, cb)
   
   ###*
   # binds callback to LOADING state
@@ -136,19 +144,44 @@ class ResourceLoader
     @bindCallback(ResourceLoader.STATES.LOADED, cb)
 
   ###*
+  # binds callback to SAVING state
+  # @param {Function} cb
+  # @return {ResourceLoader}
+  ###
+  onSaving: (cb) ->
+    @bindCallback(ResourceLoader.STATES.SAVING, cb)
+
+  ###*
+  # binds callback to SAVED state
+  # @param {Function} cb
+  # @return {ResourceLoader}
+  ###
+  onSaved: (cb) ->
+    @bindCallback(ResourceLoader.STATES.SAVED, cb)
+
+  ###*
+  # binds callback to REMOVING state
+  # @param {Function} cb
+  # @return {ResourceLoader}
+  ###
+  onRemoving: (cb) ->
+    @bindCallback(ResourceLoader.STATES.REMOVING, cb)
+
+  ###*
+  # binds callback to REMOVED state
+  # @param {Function} cb
+  # @return {ResourceLoader}
+  ###
+  onRemoved: (cb) ->
+    @bindCallback(ResourceLoader.STATES.REMOVED, cb)
+
+  ###*
   # binds callback to REJECTED state
   # @param {Function} cb
   # @return {ResourceLoader}
   ###
   onRejected: (cb) ->
     @bindCallback(ResourceLoader.STATES.REJECTED, cb)
-
-  ###*
-  # indicates whether client is waiting for server response
-  # @return {Boolean}
-  ###
-  isWaiting: ->
-    @state is ResourceLoader.STATES.LOADING
   
   ###*
   # indicates whether resource or collection is beeing loading
@@ -163,39 +196,90 @@ class ResourceLoader
   ###
   isLoaded: ->
     @state is ResourceLoader.STATES.LOADED
-  
+    
   ###*
-  # indicates wether resource or collection has been dumped
+  # indicates whether resource or collection is beeing loading
   # @return {Boolean}
   ###
-  isDumped: ->
-    @state is ResourceLoader.STATES.DUMPED
+  isSaving: ->
+    @state is ResourceLoader.STATES.SAVING
   
+  ###*
+  # indicates whether resource or collection has been loaded
+  # @return {Boolean}
+  ###
+  isSaved: ->
+    @state is ResourceLoader.STATES.SAVED
+    
+  ###*
+  # indicates whether resource or collection is beeing removing
+  # @return {Boolean}
+  ###
+  isRemoving: ->
+    @state is ResourceLoader.STATES.REMOVING
+  
+  ###*
+  # indicates whether resource or collection has been removed
+  # @return {Boolean}
+  ###
+  isRemoved: ->
+    @state is ResourceLoader.STATES.REMOVED
+  
+  ###*
+  # indicates wether resource or collection has been clened
+  # @return {Boolean}
+  ###
+  isCleaned: ->
+    @state is ResourceLoader.STATES.CLEANED
+  
+  ###*
+  # indicates whether client is waiting for server response
+  # @return {Boolean}
+  ###
+  isWaiting: ->
+    @state in [
+      ResourceLoader.STATES.LOADING
+      ResourceLoader.STATES.SAVING
+      ResourceLoader.STATES.REMOVING
+    ]
+    
   ###*
   # sets base ressource and returns current instance
   # @return {Resource}
   ###
   setBase: (@baseResource) ->
     return @
-  
+    
   ###*
-  # Performs get request 
+  # Performs post request
   # @return {ResourceLoader}
-  # @param {String} url
-  # @param {Object} params
-  ###  
-  makeGetRequest: (url, params) ->
-    # notify that we are about to start request
-    @setState(ResourceLoader.STATES.LOADING, [url, params])
-    promise = @conf.$http
-      method: 'GET'
-      url: url
-      params: params
+  # @param {Object} config Object describing the request to be made
+  # @param {String} config.method
+  # @param {String} config.url
+  # @param {Object} [config.params]
+  # @param {Object} [config.data]
+  ###
+  makeRequest: (config) ->
+    # maps methods to states
+    beforeRequestMap =
+      GET: ResourceLoader.STATES.LOADING
+      POST: ResourceLoader.STATES.SAVING
+      PUT: ResourceLoader.STATES.SAVING
+      DELETE: ResourceLoader.STATES.REMOVING
+    # on response
+    afterResponseMap =
+      GET: ResourceLoader.STATES.LOADED
+      POST: ResourceLoader.STATES.SAVED
+      PUT: ResourceLoader.STATES.SAVED
+      DELETE: ResourceLoader.STATES.REMOVED
+    # performs request
+    @setState(beforeRequestMap[config.method], arguments)
+    promise = @conf.$http(config)
     promise.then (response) =>
-      @setState(ResourceLoader.STATES.LOADED, [response])
+      @setState(afterResponseMap[config.method], [response])
     promise.catch (response) =>
       @setState(ResourceLoader.STATES.REJECTED, [response])
-    return @ 
+    return @
 
 ###*
 # Handles single resource
@@ -222,43 +306,74 @@ class Resource extends ResourceLoader
     # handle response
     @data = {}
     @onLoaded (response) ->
-      # dump data object
-      @dump()
+      # clean data object
+      @clean(false)
       # fill data object with response data
       angular.extend(@data, response.data)
-      # # angular.extend breaks the reference
-      # @data[key] = response.data[key] for key of response.data
+    @onSaved (response) ->
+      # clean data object
+      @clean(false)
+      @id = response.data.id
+      # fill data object with response data
+      angular.extend(@data, response.data)
       
   ###*
   # builds url for current resource (no relation included)
-  # @return {String}
+  # @return {String} url without trailing slashes
   ###
   getUrl: ->
-    [@conf.baseUrl, @resource, @id].join('/')
+    [@conf.baseUrl, @resource, @id].join('/').replace(/\/+$/, '')
   
   ###*
   # builds full url of current resource with relations
-  # @return {String}
+  # @return {String} url without trailing slashes
   ###
   getFullUrl: ->
     if @baseResource?
-      [@baseResource.getFullUrl(), @resource, @id].join('/')
+      [@baseResource.getFullUrl(), @resource, @id].join('/').replace(/\/+$/, '')
     else
       @getUrl()
       
   ###*
   # loads resource
+  # @param {Object} params
   # @return {Resource}
   ###
   get: (params) ->
-    @makeGetRequest(@getFullUrl(), params)
+    @makeRequest
+      method: 'GET' 
+      url: @getFullUrl()
+      params: params
+ 
+  ###*
+  # saves current resource
+  # @return {Resource}
+  ###
+  save: ->
+    if @id
+      method = 'PUT'
+    else
+      method = 'POST'
+    @makeRequest
+      method: method 
+      url: @getFullUrl()
+      data: @data
+      
+  ###*
+  # removes current resource
+  # @return {Resource}
+  ###
+  remove: ->
+    @makeRequest
+      method: 'DELETE'
+      url: @getFullUrl()
 
   ###*
   # returns resource manager for related resource
   # @return {ResourceManager} returns resource manager for related resource
   ###
   rel: (subResource) ->
-    new ResourceManager(@conf, subResource, @)
+    new ResourceCollection(@conf, subResource, @)
 
   ###*
   # returns new instance with same id but with reseted  data and baseResource
@@ -269,11 +384,13 @@ class Resource extends ResourceLoader
   
   ###*
   # deletes all data an resets state
+  # @param {Boolean} setState changes state to CLEANED if true 
   # @return {Resource}
   ###
-  dump:  ->
+  clean: (setState = true) ->
     delete @data[key] for key of @data
-    @setState(ResourceLoader.STATES.DUMPED)
+    if setState
+      @setState(ResourceLoader.STATES.CLEANED)
     return @
     
 ###*
@@ -294,16 +411,24 @@ class ResourceCollection extends ResourceLoader
     # handle reponse
     @data = []
     @onLoaded (response) ->
-      # stop if response body is ot an arrayempty
+      # stop if response body is ot an array
       return if not Array.isArray(response.data)
-      @data.splice(0, @data.length) # remove all objects from array
+      @clean()
       # wrap each resource inside a Resource instance
       for resource, i in response.data
         r = new Resource(@conf, @resource, resource.id, @baseResource)
         r.data = resource
         r.state = ResourceLoader.STATES.LOADED
         @data[i] = r
-        
+
+  ###*
+  # requests and returns one resource
+  # @param {Number|String} id Request parameters for query string
+  # @return {Resource} Description
+  ###
+  one: (id) ->
+    new Resource(@conf, @resource, id, @baseResource)
+
   ###*
   # builds url for current resource
   # @return {String}
@@ -327,45 +452,28 @@ class ResourceCollection extends ResourceLoader
   # @return {Resource}
   ###
   get: (params) ->
-    @makeGetRequest(@getFullUrl(), params)
+    @makeRequest
+      method: 'GET'
+      url: @getFullUrl()
+      params: params
 
   ###*
   # deletes all data an resets state
+  # @param {Boolean} setState changes state to CLEANED if true 
   # @return {ResourceCollection}
   ###
-  dump:  ->
-    delete @data[key] for key of @data
-    @setState(ResourceLoader.STATES.DUMPED)
+  clean: (setState=true)  ->
+    @data.splice(0, @data.length) # remove all objects from array
+    if setState
+      @setState(ResourceLoader.STATES.CLEANED)
     return @
-
-###*
-#
-# @memberOf kdResourceManager
-# @namespace ResourceManager
-###
-class ResourceManager
-  ###*
-  # contrcutor method
-  # @param {ResourceManagerConfiguation} conf
-  # @param {String} resource Name of resource
-  # @param {Resource} baseResource When this resource is beeing used in context of a relationship 
-  ###
-  constructor: (@conf, @resource, @baseResource) ->
     
   ###*
-  # requests and returns collection of resources
+  # returns new instance with same id but with reseted  data and baseResource
   # @return {ResourceCollection}
   ###
-  many: ->
-    new ResourceCollection(@conf, @resource, @baseResource)
-  
-  ###*
-  # requests and returns one resource
-  # @param {Number|String} id Request parameters for query string
-  # @return {Resource} Description
-  ###
-  one: (id) ->
-    new Resource(@conf, @resource, id, @baseResource)
+  asBase: ->
+    new ResourceCollection(@conf, @resource)
 
 ###*
 # Provides init function for ResourceManager
@@ -404,4 +512,25 @@ kdResourceManager.provider 'kdResourceManager', class ResourceManagerProvider
       debug: @debug
       $http: $http
     (resource, baseResource) -> 
-      new ResourceManager(conf, resource, baseResource)
+      new ResourceCollection(conf, resource, baseResource)
+
+# ###*
+# #
+# # @memberOf kdResourceManager
+# # @namespace ResourceManager
+# ###
+# class ResourceManager
+#   ###*
+#   # contrcutor method
+#   # @param {ResourceManagerConfiguation} conf
+#   # @param {String} resource Name of resource
+#   # @param {Resource} baseResource When this resource is beeing used in context of a relationship 
+#   ###
+#   constructor: (@conf, @resource, @baseResource) ->
+    
+#   ###*
+#   # requests and returns collection of resources
+#   # @return {ResourceCollection}
+#   ###
+#   many: ->
+#     new ResourceCollection(@conf, @resource, @baseResource)

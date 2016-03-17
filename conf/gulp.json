@@ -31,9 +31,8 @@
     "bower_components/bootstrap-sass/assets/fonts/bootstrap/*": "public/fonts/"
   },
   "karma": {
-    "configFile": "/Users/denis/Desktop/angular-resource-manager/karma.conf.js",
-    "singleRun": false,
-    "logLevel": "DEBUG"
+    "configFile": "test/karma.conf.coffee",
+    "singleRun": false
   },
   "nodemon": {
     "script": "app.js",

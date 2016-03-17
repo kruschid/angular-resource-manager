@@ -25,6 +25,13 @@ class ResourceLoader
     REMOVING: 'REMOVING'
     REMOVED: 'REMOVED'
     REJECTED: 'REJECTED'
+  
+  ###*
+  # indicates wether resoure or colelction was already rendered in template
+  # @var {Booelean} rendered
+  # @memberOf Resource
+  # @memberOf ResourceCollection
+  ###
     
   ###*
   # configuration object
@@ -106,7 +113,7 @@ class ResourceLoader
   ###
   setState: (@state, args) ->
     if @conf.debug
-      console.log @state, args
+      console.log @resource, @, @state, args
     for cb in @callbacks[@state]
       cb.apply(@, args) 
     return @
@@ -305,6 +312,7 @@ class Resource extends ResourceLoader
     super()
     # handle response
     @data = {}
+    @subResources = {}
     @onLoaded (response) ->
       # clean data object
       @clean(false)
@@ -344,7 +352,7 @@ class Resource extends ResourceLoader
       method: 'GET' 
       url: @getFullUrl()
       params: params
- 
+
   ###*
   # saves current resource
   # @return {Resource}
@@ -372,14 +380,16 @@ class Resource extends ResourceLoader
   # returns resource manager for related resource
   # @return {ResourceManager} returns resource manager for related resource
   ###
-  rel: (subResource) ->
-    new ResourceCollection(@conf, subResource, @)
-
+  rel: (resourceName) ->
+    if not @subResources[resourceName]
+      @subResources[resourceName] = new ResourceCollection(@conf, resourceName, @)  
+    return @subResources[resourceName]
+ 
   ###*
   # returns new instance with same id but with reseted  data and baseResource
   # @return {Resource}
   ###
-  asBase: ->
+  orphan: ->
     new Resource(@conf, @resource, @id)
   
   ###*
@@ -392,7 +402,47 @@ class Resource extends ResourceLoader
     if setState
       @setState(ResourceLoader.STATES.CLEANED)
     return @
+  
+  ###*
+  # cleans data and id
+  # @return {Resource}
+  ###
+  bare: ->
+    @clean(false)
+    delete @id
+    return @   
+  
+  ###*
+  # overwrites/sets properties
+  # @param {Object} properties
+  # @return {Resource}
+  ###
+  patch: (properties) ->
+    angular.extend(@data, properties)
+    return @
     
+  ###*
+  # overwrites/sets properties
+  # @param {Object} properties
+  # @return {Resource}
+  ###
+  set: (properties) ->
+    @clean(false)
+    angular.extend(@data, properties)
+    return @
+  
+  ###*
+  # checks if current ressource has related objects in a collection
+  # @param {ResourceCollection} collection
+  # @param {String} foreignKey 
+  # @return {Boolean}
+  ###
+  hasRelative: (collection, foreignKey) ->
+    for resource in collection.data
+      if @id is resource[foreignKey]
+        return true
+    return false 
+  
 ###*
 # Handles resource-collections
 # @memberOf kdResourceManager
@@ -413,7 +463,7 @@ class ResourceCollection extends ResourceLoader
     @onLoaded (response) ->
       # stop if response body is ot an array
       return if not Array.isArray(response.data)
-      @clean()
+      @clean(false)
       # wrap each resource inside a Resource instance
       for resource, i in response.data
         r = new Resource(@conf, @resource, resource.id, @baseResource)
@@ -457,6 +507,16 @@ class ResourceCollection extends ResourceLoader
       url: @getFullUrl()
       params: params
 
+  ###*
+  # loads resouce if data is empty
+  # @return {Resource}
+  ###
+  tget: (params) ->
+    if !@rendered
+      @rendered = true
+      @get(params)
+    return @
+ 
   ###*
   # deletes all data an resets state
   # @param {Boolean} setState changes state to CLEANED if true 
@@ -512,7 +572,7 @@ kdResourceManager.provider 'kdResourceManager', class ResourceManagerProvider
       debug: @debug
       $http: $http
     (resource, baseResource) -> 
-      new ResourceCollection(conf, resource, baseResource)
+      ResourceCollection.bind(undefined, conf, resource, baseResource)
 
 # ###*
 # #

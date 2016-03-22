@@ -137,12 +137,10 @@ describe 'Resource', ->
     new User().one(2).isIn(collection).should.be.true
     new User().one(3).isIn(collection).should.be.false
 
-  it 'should allow using promises', ->
-    
+  it 'should allow using promises', ->    
     backend.expectGET('/users/5').respond -> [200]
     users = new User().one(5).get()
     users.promise.then ->
-    
     users.get().promise
     promiseA = users.promise
     backend.flush()

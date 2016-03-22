@@ -34,12 +34,14 @@ describe 'Resource', ->
     usersGroups = new User().one(5).rel('groups').one(1).get()
     backend.flush()
   
-  it 'orphan() should create a new instance without a baseresource', ->
+  it 'orphan() should delete association with base', ->
     usersGroups = new User().one(5).rel('groups').one(1)
+    backend.expectGET('/users/5/groups/1').respond -> [200]
+    usersGroups.get()
     orphan = usersGroups.orphan()
-    usersGroups.should.be.not.equal(orphan)
     backend.expectGET('/groups/1').respond -> [200]
     orphan.get()
+    usersGroups.should.be.equal(orphan)
     backend.flush()
    
   it 'should store data in same object over several requests', ->
@@ -86,8 +88,8 @@ describe 'Resource', ->
     user2 = new User().one(2)
     user1friends = user1.rel('friends')
     user1friends.data = [
-      {friendId: 2, userId:1}
-      {friendId: 3, userId:1}
+      new User().one(1).set({friendId: 2, userId:1})
+      new User().one(2).set({friendId: 3, userId:1})
     ]
     # user2 is friend of user1
     user2.hasRelative(user1friends, 'friendId').should.be.true
@@ -103,9 +105,49 @@ describe 'Resource', ->
     should.not.exist(user.id)
     should.not.exist(user.data.name)
     should.not.exist(user.data.country)
+
+  it 'set(object) should replace all properties', ->
+    user = new User().one()
+    user.set
+      name: 'Merkel'
+    user.data.name.should.be.equal('Merkel')
+    user.set
+      email: 'vladimir.putin@mail.ru'
+    user.data.email.should.be.equal('vladimir.putin@mail.ru')
+    should.not.exist(user.data.name)
+      
+  it 'set(resouce) should replace resource data and id', ->
+    user1 = new User().one(1).set
+      name: 'Phobos'
+      email: 'phobos@mars.com'
+    user2 = new User().one(2).set
+      name: 'Moon'
+    user2.set(user1)
+    user2.id.should.be.equal(1)
+    user2.data.name.should.be.equal('Phobos')
+    user2.data.email.should.be.equal('phobos@mars.com')
+  
+  it 'isIn() should check if resource is in a collection', ->
+    collection = new User()
+    collection.data = [
+      new User().one(1)
+      new User().one(2)
+    ]
+    new User().one(1).isIn(collection).should.be.true
+    new User().one(2).isIn(collection).should.be.true
+    new User().one(3).isIn(collection).should.be.false
+
+  it 'promise object should change every request', ->
+    backend.expectGET('/users/5').respond -> [200]
+    users = new User().one(5).get()
+    promiseA = users.promise
+    backend.flush()
+    # backend.expectGET('/users/5').respond -> [200]
+    # users.get().promise.should.be.equal(promiseA)
+    # backend.flush()
+    
     
   it 'clean() should clean data'
   it 'base() should set a new base resource'
   it 'patch() should replace certain properties'
-  it 'set() should replace all properties'
   it 'copy() should return a copy of a resource'

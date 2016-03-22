@@ -17,7 +17,6 @@ class ResourceLoader
   # @memberOf ResourceLoader
   ###
   @STATES:
-    CLEANED: 'CLEANED'
     LOADING: 'LOADING' 
     LOADED: 'LOADED'
     SAVING: 'SAVING'
@@ -26,13 +25,6 @@ class ResourceLoader
     REMOVED: 'REMOVED'
     REJECTED: 'REJECTED'
   
-  ###*
-  # indicates wether resoure or colelction was already rendered in template
-  # @var {Booelean} rendered
-  # @memberOf Resource
-  # @memberOf ResourceCollection
-  ###
-    
   ###*
   # configuration object
   # @var {ResourceManagerConfiguation} conf 
@@ -49,7 +41,14 @@ class ResourceLoader
   
   ###*
   # is set when resource is beeing used in context of a relationship
-  # @var {Resource} baseResource
+  # @var {Resource} base
+  # @memberOf Resource
+  # @memberOf ResourceCollection
+  ###
+  
+  ###*
+  # is set when resource is beeing used in context of a relationship
+  # @var {Resource} base
   # @memberOf Resource
   # @memberOf ResourceCollection
   ###
@@ -70,6 +69,14 @@ class ResourceLoader
   # @memberOf ResourceCollection
   ###
   
+  
+  ###*
+  # holds current promise object
+  # @var {Promise} promise
+  # @memberOf Resource
+  # @memberOf ResourceCollection
+  ###  
+  
   ###*
   # Holds response data
   # @var {Object|Array} data
@@ -89,7 +96,6 @@ class ResourceLoader
   ###
   constructor: ->
     @callbacks =
-      CLEANED: []
       LOADING: []
       LOADED: []
       SAVING: []
@@ -113,7 +119,7 @@ class ResourceLoader
   ###
   setState: (@state, args) ->
     if @conf.debug
-      console.log @resource, @, @state, args
+      console.log @resource, @state, args, @
     for cb in @callbacks[@state]
       cb.apply(@, args) 
     return @
@@ -126,13 +132,6 @@ class ResourceLoader
   bindCallback: (state, cb) ->
     @callbacks[state].push(cb)
     return @
-  
-  ###*
-  # binds callback to CLEANED state
-  # @return {ResourceLoader}
-  ###
-  onCleaned: (cb) ->
-    @bindCallback(ResourceLoader.STATES.CLEANED, cb)
   
   ###*
   # binds callback to LOADING state
@@ -231,14 +230,7 @@ class ResourceLoader
   ###
   isRemoved: ->
     @state is ResourceLoader.STATES.REMOVED
-  
-  ###*
-  # indicates wether resource or collection has been clened
-  # @return {Boolean}
-  ###
-  isCleaned: ->
-    @state is ResourceLoader.STATES.CLEANED
-  
+
   ###*
   # indicates whether client is waiting for server response
   # @return {Boolean}
@@ -249,12 +241,31 @@ class ResourceLoader
       ResourceLoader.STATES.SAVING
       ResourceLoader.STATES.REMOVING
     ]
+  
+  ###*
+  # indicates wether client has received server response
+  # @return {Boolean}
+  ###
+  isResolved: ->
+    @state in [
+      ResourceLoader.STATES.LOADED
+      ResourceLoader.STATES.SAVED
+      ResourceLoader.STATES.REMOVED
+    ]
     
   ###*
   # sets base ressource and returns current instance
   # @return {Resource}
   ###
-  setBase: (@baseResource) ->
+  setBase: (@base) ->
+    return @
+    
+  ###*
+  # returns new instance with same id but with reseted data and base
+  # @return {Resource}
+  ###
+  orphan: ->
+    @base = undefined
     return @
     
   ###*
@@ -281,10 +292,10 @@ class ResourceLoader
       DELETE: ResourceLoader.STATES.REMOVED
     # performs request
     @setState(beforeRequestMap[config.method], arguments)
-    promise = @conf.$http(config)
-    promise.then (response) =>
+    @promise = @conf.$http(config)
+    @promise.then (response) =>
       @setState(afterResponseMap[config.method], [response])
-    promise.catch (response) =>
+    @promise.catch (response) =>
       @setState(ResourceLoader.STATES.REJECTED, [response])
     return @
 
@@ -302,25 +313,30 @@ class Resource extends ResourceLoader
   ###
   
   ###*
+  # maps ResourceCollection instances of subresources
+  # @var {Object<String,ResourceCollection>} subs
+  # @memberOf Resource
+  ###
+  
+  ###*
   # initializes config  
   # @param {ResourceManagerConfiguation} conf
   # @param {String} resource Name of resource
   # @param {Number|String} id Id of resource
   # @param {Resource} [baseResourse] The base-resource when using resource in context of a relation
   ###
-  constructor: (@conf, @resource, @id, @baseResource) ->
+  constructor: (@conf, @resource, @id, @base) ->
     super()
-    # handle response
     @data = {}
-    @subResources = {}
+    @subs = {}
     @onLoaded (response) ->
       # clean data object
-      @clean(false)
+      @clean()
       # fill data object with response data
       angular.extend(@data, response.data)
     @onSaved (response) ->
       # clean data object
-      @clean(false)
+      @clean()
       @id = response.data.id
       # fill data object with response data
       angular.extend(@data, response.data)
@@ -337,8 +353,8 @@ class Resource extends ResourceLoader
   # @return {String} url without trailing slashes
   ###
   getFullUrl: ->
-    if @baseResource?
-      [@baseResource.getFullUrl(), @resource, @id].join('/').replace(/\/+$/, '')
+    if @base?
+      [@base.getFullUrl(), @resource, @id].join('/').replace(/\/+$/, '')
     else
       @getUrl()
       
@@ -381,26 +397,18 @@ class Resource extends ResourceLoader
   # @return {ResourceManager} returns resource manager for related resource
   ###
   rel: (resourceName) ->
-    if not @subResources[resourceName]
-      @subResources[resourceName] = new ResourceCollection(@conf, resourceName, @)  
-    return @subResources[resourceName]
+    if not @subs[resourceName]
+      @subs[resourceName] = new ResourceCollection(@conf, resourceName, @)  
+    return @subs[resourceName]
  
-  ###*
-  # returns new instance with same id but with reseted  data and baseResource
-  # @return {Resource}
-  ###
-  orphan: ->
-    new Resource(@conf, @resource, @id)
-  
   ###*
   # deletes all data an resets state
   # @param {Boolean} setState changes state to CLEANED if true 
   # @return {Resource}
   ###
-  clean: (setState = true) ->
+  clean: (setState) ->
     delete @data[key] for key of @data
-    if setState
-      @setState(ResourceLoader.STATES.CLEANED)
+    @subs = []
     return @
   
   ###*
@@ -408,12 +416,13 @@ class Resource extends ResourceLoader
   # @return {Resource}
   ###
   bare: ->
-    @clean(false)
+    @clean()
     delete @id
+    delete @state
     return @   
   
   ###*
-  # overwrites/sets properties
+  # overwrites certain properties
   # @param {Object} properties
   # @return {Resource}
   ###
@@ -422,14 +431,38 @@ class Resource extends ResourceLoader
     return @
     
   ###*
+  # replaces properties or wohle resource incl id 
+  # @param {Resource|Object} object
+  # @return {Resource}
+  ###
+  set: (object) ->
+    if object instanceof Resource
+      @setResource(object)
+    else
+      @setProperties(object)
+    
+  
+  ###*
   # overwrites/sets properties
   # @param {Object} properties
   # @return {Resource}
   ###
-  set: (properties) ->
-    @clean(false)
+  setProperties: (properties) ->
+    @clean()
     angular.extend(@data, properties)
     return @
+  
+  ###*
+  # replaces data,id by the data,id of passed resource
+  # @param {Resource} resource
+  # @return {Resource}
+  ###
+  setResource: (resource) ->
+    @id = resource.id
+    @state = resource.state
+    @setProperties(resource.data)
+    return @
+    
   
   ###*
   # checks if current ressource has related objects in a collection
@@ -439,9 +472,20 @@ class Resource extends ResourceLoader
   ###
   hasRelative: (collection, foreignKey) ->
     for resource in collection.data
-      if @id is resource[foreignKey]
+      if @id is resource.data[foreignKey]
         return true
-    return false 
+    return false
+    
+  ###*
+  # check if resource is in a collection 
+  # @param {ResourceCollection} collection
+  # @return {Boolean}
+  ###
+  isIn: (collection) ->
+    for resource in collection.data
+      if @id is resource.id
+        return true
+    return false
   
 ###*
 # Handles resource-collections
@@ -453,9 +497,9 @@ class ResourceCollection extends ResourceLoader
   # Constructor-Description
   # @param {ResourceManagerConfiguation} conf
   # @param {String} resource Name of resource
-  # @param {Resource} baseResource When this resource is beeing used in context of a relationship 
+  # @param {Resource} base When this resource is beeing used in context of a relationship 
   ###
-  constructor: (@conf, @resource, @baseResource) ->
+  constructor: (@conf, @resource, @base) ->
     # we let the base class handle the responses
     super()
     # handle reponse
@@ -463,10 +507,10 @@ class ResourceCollection extends ResourceLoader
     @onLoaded (response) ->
       # stop if response body is ot an array
       return if not Array.isArray(response.data)
-      @clean(false)
+      @clean()
       # wrap each resource inside a Resource instance
       for resource, i in response.data
-        r = new Resource(@conf, @resource, resource.id, @baseResource)
+        r = new Resource(@conf, @resource, resource.id, @base)
         r.data = resource
         r.state = ResourceLoader.STATES.LOADED
         @data[i] = r
@@ -477,7 +521,7 @@ class ResourceCollection extends ResourceLoader
   # @return {Resource} Description
   ###
   one: (id) ->
-    new Resource(@conf, @resource, id, @baseResource)
+    new Resource(@conf, @resource, id, @base)
 
   ###*
   # builds url for current resource
@@ -491,8 +535,8 @@ class ResourceCollection extends ResourceLoader
   # @return {String}
   ###
   getFullUrl: ->
-    if @baseResource?
-      [@baseResource.getFullUrl(), @resource].join('/')
+    if @base?
+      [@base.getFullUrl(), @resource].join('/')
     else
       @getUrl()
  
@@ -508,12 +552,11 @@ class ResourceCollection extends ResourceLoader
       params: params
 
   ###*
-  # loads resouce if data is empty
+  # loads resouce only if no response available
   # @return {Resource}
   ###
   tget: (params) ->
-    if !@rendered
-      @rendered = true
+    if !@isWaiting() && !@isResolved()
       @get(params)
     return @
  
@@ -524,16 +567,29 @@ class ResourceCollection extends ResourceLoader
   ###
   clean: (setState=true)  ->
     @data.splice(0, @data.length) # remove all objects from array
-    if setState
-      @setState(ResourceLoader.STATES.CLEANED)
     return @
-    
+   
   ###*
-  # returns new instance with same id but with reseted  data and baseResource
-  # @return {ResourceCollection}
+  # returns one resource matches search criteria
+  # @return {Resource}
   ###
-  asBase: ->
-    new ResourceCollection(@conf, @resource)
+  find: (s) ->
+    r = @filter(s)
+    if r.length
+      r[0]
+    else
+      undefined
+  
+  ###*
+  # returns resources matches search criteria
+  # @return {Array<Resource>}
+  ###
+  filter: (s) ->
+    @data.filter (resource) ->
+      f = 0
+      for key, value of s
+        f++ if resource.data[key] is value
+      return (f is Object.keys(s).length)   
 
 ###*
 # Provides init function for ResourceManager
@@ -564,33 +620,12 @@ kdResourceManager.provider 'kdResourceManager', class ResourceManagerProvider
   ###*
   # getter for ResourceManager instance
   # @param {$http} $http
-  # @return {Function} Function that takes resourceName:String and baseResource:Resource as arguments and returns ResourceManager instance
+  # @return {Function} Function that takes resourceName:String and base:Resource as arguments and returns ResourceManager instance
   ###
   $get: ($rootScope, $http) -> 
     conf =
       baseUrl: @baseUrl
       debug: @debug
       $http: $http
-    (resource, baseResource) -> 
-      ResourceCollection.bind(undefined, conf, resource, baseResource)
-
-# ###*
-# #
-# # @memberOf kdResourceManager
-# # @namespace ResourceManager
-# ###
-# class ResourceManager
-#   ###*
-#   # contrcutor method
-#   # @param {ResourceManagerConfiguation} conf
-#   # @param {String} resource Name of resource
-#   # @param {Resource} baseResource When this resource is beeing used in context of a relationship 
-#   ###
-#   constructor: (@conf, @resource, @baseResource) ->
-    
-#   ###*
-#   # requests and returns collection of resources
-#   # @return {ResourceCollection}
-#   ###
-#   many: ->
-#     new ResourceCollection(@conf, @resource, @baseResource)
+    (resource, base) -> 
+      ResourceCollection.bind(undefined, conf, resource, base)

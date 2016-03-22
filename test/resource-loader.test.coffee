@@ -195,3 +195,5 @@ describe 'ResourceLoader', ->
     errors.name.should.be.equal('required')
 
   it 'should provide a new promise object for each request'
+  
+  it 'isResolved() should indicate wether response was received'

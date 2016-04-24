@@ -1,16 +1,11 @@
 navigation = angular.module 'navigation', []
 
 navigation.constant 'NavbarItems', [
-  routeName: 'home'
-  label: 'Home'
-,  
-  routeName: 'error'
-  label: 'Error 404'
-  params: {code: 404}
+  routeName: 'ngResource'
+  label: 'ngResource'
 ,
-  routeName: 'error'
-  label: 'Error 500'
-  params: {code: 500}
+  routeName: 'resourceManager'
+  label: 'resurce-manager'
 ]
 
 ###*

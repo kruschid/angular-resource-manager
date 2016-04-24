@@ -2,10 +2,7 @@
   "run": [],
   "clean": "public/**/*",
   "components": {
-    "src": [
-      "app/**/*.litcoffee",
-      "app/**/*.coffee"
-    ],  
+    "src": "src/client/**/*.coffee",  
     "dest": "public/js/"
   },
   "libs": {
@@ -19,33 +16,32 @@
     "dest": "public/js/"
   },
   "views": {
-    "src": "app/index.jade",
-    "include": "app/*/**/*.jade",
+    "src": "src/client/index.jade",
+    "include": "src/client/*/**/*.jade",
     "dest": "public/"
   },
   "css": {
-    "src": "app/assets/css/styles.sass",
+    "src": "src/client/assets/css/styles.sass",
     "dest": "public/css/"
   },
   "copy": {
     "bower_components/bootstrap-sass/assets/fonts/bootstrap/*": "public/fonts/"
   },
-  "karma": {
-    "configFile": "test/karma.conf.coffee",
-    "singleRun": false
-  },
   "nodemon": {
-    "script": "app.js",
+    "script": "src/server/server.coffee",
     "watch": [
-      "conf/*"
+      "conf/*",
+      "src/server/server.coffee"
     ],
     "env": {
-      "NODE_ENV": "dev"
+      "NODE_ENV": "development"
     }
   },
   "browserSync": {
     "proxy": "localhost:3000",
     "port": 3001,
-    "files": "public/**/*"
+    "files": [
+      "public/**/*"
+    ]
   }
 }

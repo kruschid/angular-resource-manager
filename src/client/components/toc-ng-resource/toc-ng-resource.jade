@@ -1,0 +1,88 @@
+script(type='text/ng-template', id='toc-ng-resource/index.html')
+  h2 Basisfunktionen
+  .row
+    read-ng-resource.col-md-6
+    delete-ng-resource.col-md-6
+  .row
+    create-ng-resource.col-md-6
+    update-ng-resource.col-md-6
+  h2 Beziehungen
+  .row
+    read1n-ng-resource.col-md-6
+    create1n-ng-resource.col-md-6
+  .row
+    manage-mn-ng-resource.col-md-6
+
+script(type='text/ng-template', id='toc-ng-resource/read.html')
+  h3 Ressourcen auslesen
+  strong(ng-if='vm.isLoading()') Lade Kapitel...
+  ul
+    li(ng-repeat='chapter in vm.chapters') {{chapter.title}} ({{chapter.id}})
+    
+script(type='text/ng-template', id='toc-ng-resource/delete.html')
+  h3 Ressource entfernen
+  p Bitte die ensprechende Ressource anklicken.
+  strong(ng-if='vm.isDeleting()') Entferne Kapitel...
+  ul
+    li(ng-repeat='chapter in vm.chapters'
+       ng-click='vm.delete(chapter)') {{chapter.title}} ({{chapter.id}})
+
+script(type='text/ng-template', id='toc-ng-resource/create.html')
+  h3 Ressource erstellen
+  ul
+    li(ng-repeat='chapter in vm.chapters') {{chapter.title}} ({{chapter.id}})
+  input(type='text', ng-model='newChapter.title')
+  button(ng-click='vm.create(newChapter)') Erstellen
+  strong(ng-if='vm.isSaving()') Erstelle Kapitel..
+
+script(type='text/ng-template', id='toc-ng-resource/update.html')
+  h3 Ressource manipulieren
+  p Bitte die ensprechende Ressource anklicken.
+  ul
+    li(ng-repeat='chapter in vm.chapters'
+       ng-click='$parent.editChapter=chapter') {{chapter.title}} ({{chapter.id}})
+  div(ng-if='editChapter')
+    input(type='text', ng-model='editChapter.title')
+    button(ng-click='vm.update(editChapter)') Aktualisieren
+    strong(ng-if='vm.isSaving()') Aktualisieren Kapitel..
+ 
+script(type='text/ng-template', id='toc-ng-resource/read1n.html')
+  h3 Ressourcen auslesen (1:n)
+  strong(ng-if='vm.isLoading()') Lade Kapitel...
+  ul 
+    li(ng-repeat='chapter in vm.chapters')
+      {{chapter.title}}
+      ul(ng-if='chapter.children')
+        li(ng-repeat='child in chapter.children') {{child.title}} 
+
+script(type='text/ng-template', id='toc-ng-resource/create1n.html')
+  h3 Ressourcen erstellen (1:n)
+  p Zum Anlegen von Unterkapitel bitte ein Kapitel anklicken.
+  strong(ng-if='vm.isLoading()') Lade Kapitel...
+  ul 
+    li(ng-repeat='chapter in vm.chapters'
+       ng-click='$parent.parentChapter=chapter')
+      {{chapter.title}}
+      ul(ng-if='chapter.children')
+        li(ng-repeat='child in chapter.children') {{child.title}}
+  div(ng-if='parentChapter')
+    input(type='text', ng-model='newSubChapter.title')
+    button(ng-click='vm.createSubChapter(parentChapter, newSubChapter)') Erstellen
+    strong(ng-if='vm.isSaving()') Erstelle Kapitel..
+
+script(type='text/ng-template', id='toc-ng-resource/managemn.html')
+  h3 Ressource verwalten (n:m)
+  p Gruppen anklicken, um Beziehungen zu erstellen bzw. zu entfernen.
+  strong(ng-if='vm.isLoading()') Lade...
+  strong(ng-if='vm.isSaving()') Speichere...
+  strong(ng-if='vm.isDeleting()') Entferne...
+  ul(ng-repeat='user in vm.users')  
+    li Gruppen von {{user.name}}
+      ul
+        li(ng-repeat='group in user.groups',
+          ng-click='vm.removeGroupUser(group,user)') {{group.name}}
+    li Nicht abonnierte Gruppen
+      ul
+        li(ng-repeat='group in vm.groups'
+           ng-if='!vm.hasGroup(user, group)'
+           ng-click='vm.addGroup(user, group)') {{group.name}}

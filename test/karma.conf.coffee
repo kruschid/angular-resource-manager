@@ -22,7 +22,7 @@ module.exports = (config) ->
     files: [
       'bower_components/angular/angular.js'
       'bower_components/angular-mocks/angular-mocks.js'
-      'app/shared/resource-manager/resource-manager.coffee'
+      'src/client/shared/resource-manager/resource-manager.coffee'
       'test/resource-loader.test.coffee'
       'test/resource.test.coffee'
       'test/resource-collection.test.coffee'
@@ -33,7 +33,7 @@ module.exports = (config) ->
     colors: true
       
     # enable / disable watching file and executing tests whenever any file changes
-    autoWatch: true,
+    # autoWatch: true,
 
     # start these browsers
     browsers: ['PhantomJS']
